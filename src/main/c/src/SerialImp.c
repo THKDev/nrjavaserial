@@ -5306,7 +5306,7 @@ int lib_lock_dev_unlock( const char *filename, int pid )
 {
 	if( dev_unlock( filename, pid ) )
 	{
-		report("fhs_unlock: Unable to remove LockFile\n");
+		report("lib_lock_dev_unlock: Unable to remove LockFile\n");
 		return(1);
 	}
 	return(0);
@@ -5332,10 +5332,13 @@ int lib_lock_dev_unlock( const char *filename, int pid )
 #ifdef LIBLOCKDEV
 int lib_lock_dev_lock( const char *filename, int pid )
 {
-	char message[80];
+	char message[128];
 	if ( dev_testlock( filename ) )
 	{
-		report( "fhs_lock() lockstatus fail\n" );
+		sprintf( message,
+			"RXTX dev_testlock() Error: creating testing lock file for: %s: %s\n",
+			filename, strerror(errno) );
+		report_error( message );
 		return 1;
 	}
 	if ( dev_lock( filename ) )
@@ -5762,7 +5765,7 @@ int check_lock_pid( const char *file, int openpid )
 int check_group_uucp()
 {
 #ifndef USER_LOCK_DIRECTORY
-	FILE *testLockFile ;
+	int  testLockFile ;
 	char testLockFileDirName[] = LOCKDIR;
 	char testLockFileName[] = "tmpXXXXXX";
 	char *testLockAbsFileName;
@@ -5777,16 +5780,8 @@ int check_group_uucp()
 	strcat(testLockAbsFileName, testLockFileDirName);
 	strcat(testLockAbsFileName, "/");
 	strcat(testLockAbsFileName, testLockFileName);
-	if ( NULL == mkstemp(testLockAbsFileName) )
-	{
-		free(testLockAbsFileName);
-		report_error("check_group_uucp(): mktemp malformed string - \
-			should not happen");
-
-		return 1;
-	}
-	testLockFile = fopen (testLockAbsFileName, "w+");
-	if (NULL == testLockFile)
+	testLockFile = mkstemp(testLockAbsFileName);
+	if ( testLockFile < 0 )
 	{
 		report_error("check_group_uucp(): error testing lock file "
 			"creation Error details:");
@@ -5795,7 +5790,7 @@ int check_group_uucp()
 		return 1;
 	}
 
-	fclose (testLockFile);
+	close (testLockFile);
 	unlink (testLockAbsFileName);
 	free(testLockAbsFileName);
 

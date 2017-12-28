@@ -1,3 +1,10 @@
+# Fork
+This fork is made to support aarch64 on CentOS 7.x . A new make file Makefile.aarch64 has been made and additional fixes to the source code.
+Library is successful tested under CentOS7-aarch64 on a Khadas VIM2. Tested with Openhab2.
+
+To get this library into game file /etc/default/openhab2 must be changed. Add this line:
+EXTRA_JAVA_OPTS="-Dgnu.io.rxtx.SerialPorts=/dev/tty<your port> -DlibNRJavaSerial.userlib=<path>/libNRJavaSerial-aarch64.so"
+
 # About
 
 [![Join the chat at https://gitter.im/NeuronRobotics/nrjavaserial](https://badges.gitter.im/NeuronRobotics/nrjavaserial.svg)](https://gitter.im/NeuronRobotics/nrjavaserial?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
