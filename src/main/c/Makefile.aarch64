@@ -2,23 +2,30 @@ CC=gcc
 
 OBJDIR=build/aarch64
 SRCDIR=src
-OBJS=$(OBJDIR)/fixup.o \
-     $(OBJDIR)/fuserImp.o \
+OBJS=$(OBJDIR)/fuserImp.o \
      $(OBJDIR)/SerialImp.o
     
 TARGET=libNRJavaSerial-aarch64.so
 
-FDEBUG=-g -DDEBUG -DTRACE
+#FDEBUG=-g3 -DDEBUG -DTRACE
 
 JDK_HOME=/usr/lib/jvm/jdk1.8.0_152
 JDKINCLUDE=-I$(JDK_HOME)/include -I$(JDK_HOME)/include/linux
 
+########################################
+# or -DDISABLE_LOCKFILES
+CFLAGSLOCK=-DLIBLOCKDEV `pkg-config --cflags lockdev`
+LFLAGSLOCK=`pkg-config --libs lockdev`
+#CFLAGSLOCK=-DDISABLE_LOCKFILES
+#LFLAGSLOCK=
+
 CFLAGS=-Iinclude -Iinclude/target \
-       -DLIBLOCKDEV -O0 -Wall -c -fPIC -MMD \
-       $(JDKINCLUDE) $(FDEBUG) \
-       `pkg-config --cflags lockdev`
-CPPFLAGS=$(CFLAGS)
-LFLAGS=-shared `pkg-config --libs lockdev`
+       $(CFLAGSLOCK) -D_POSIX_C_SOURCE=200809L -D_BSD_SOURCE \
+       -Werror -Wall -Wpedantic \
+       -O0 -c -fPIC -std=c99 \
+       $(JDKINCLUDE) $(FDEBUG)
+       
+LFLAGS=-shared -std=c99 $(FDEBUG) $(LFLAGSLOCK)
 
 VPATH=$(SRCDIR)
 
@@ -26,13 +33,15 @@ VPATH=$(SRCDIR)
 all: $(TARGET)
 
 $(TARGET): $(OBJDIR) $(OBJS)
-	$(CC) $(LFLAGS) $(OBJS) -o $@
+	@echo "[LD  ] $@"
+	@$(CC) $(LFLAGS) $(OBJS) -o $@
 
 $(OBJDIR):
 	test -d $(OBJDIR) || mkdir -p $(OBJDIR)
 
 clean:
 	-rm -rf $(OBJDIR)
+	-rm -f $(TARGET)
 
 ########################################################################
 # compiling rules
@@ -40,7 +49,3 @@ clean:
 $(OBJDIR)/%.o: %.c
 	@echo "[C  ] $<"
 	@$(CC) $(CFLAGS) -c $< -o $@
-
-$(OBJDIR)/%.o: %.cpp
-	@echo "[C++] $<"
-	@$(CC) $(CPPFLAGS) -c $< -o $@

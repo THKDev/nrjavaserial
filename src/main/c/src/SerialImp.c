@@ -59,7 +59,7 @@
 #include "RXTXPort.h" /* dima */
 #else  /* dima */
 #ifndef WIN32
-#	include "config.h"
+#	include "config.h" // what a bullshit !!!!!!!!!!!!!!!!!
 #endif
 #include "gnu_io_RXTXPort.h"
 #endif /* dima */
@@ -115,9 +115,13 @@
 #	include <arpa/inet.h>
 #endif /* FLS */
 #if defined(__linux__)
-#	include <linux/types.h> /* fix for linux-2.3.4? kernels */
-#	include <linux/serial.h>
-#	include <linux/version.h>
+	#include <sys/types.h>
+	#include <linux/serial.h>
+	#include <linux/version.h>
+	#include <signal.h>
+	#include <sys/sysmacros.h>
+	#include <stdlib.h>
+	#include <unistd.h>
 #endif /* __linux__ */
 #if defined(__sun__)
 #	include <sys/filio.h>
@@ -3160,130 +3164,6 @@ int read_byte_array( JNIEnv *env,
 	return bytes;
 }
 
-#ifdef asdf
-int read_byte_array(	JNIEnv *env,
-			jobject *jobj,
-			int fd,
-			unsigned char *buffer,
-			int length,
-			int timeout )
-{
-	int ret, left, bytes = 0;
-	long now, start = 0;
-	char msg[80];
-
-	report_time_start();
-	ENTER( "read_byte_array" );
-	sprintf(msg, "read_byte_array requests %i\n", length);
-	report( msg );
-	left = length;
-	if (timeout >= 0)
-		start = GetTickCount();
-	while( bytes < length )
-	{
-		if (timeout >= 0) {
-			now = GetTickCount();
-			if (now-start >= timeout)
-				return bytes;
-		}
-RETRY:	if ((ret = READ( fd, buffer + bytes, left )) < 0 )
-		{
-			if (errno == EINTR)
-				goto RETRY;
-			report( "read_byte_array: read returned -1\n" );
-			LEAVE( "read_byte_array" );
-			return -1;
-		}
-		bytes += ret;
-		left -= ret;
-	}
-	sprintf(msg, "read_byte_array returns %i\n", bytes);
-	report( msg );
-	LEAVE( "read_byte_array" );
-	report_time_end();
-	return bytes;
-}
-
-
-int read_byte_array(	JNIEnv *env,
-			jobject *jobj,
-			int fd,
-			unsigned char *buffer,
-			int length,
-			int timeout )
-{
-	int ret, left, bytes = 0;
-	/* int count = 0; */
-	fd_set rfds;
-	struct timeval sleep;
-	struct event_info_struct *eis = find_eis( fd );
-
-#ifndef WIN32
-	struct timeval *psleep=&sleep;
-#endif /* WIN32 */
-
-	ENTER( "read_byte_array" );
-	left = length;
-	FD_ZERO( &rfds );
-	FD_SET( fd, &rfds );
-	if( timeout != 0 )
-	{
-		sleep.tv_sec = timeout / 1000;
-		sleep.tv_usec = 1000 * ( timeout % 1000 );
-	}
-	while( bytes < length )
-	{
-         /* FIXME: In Linux, select updates the timeout automatically, so
-            other OSes will need to update it manually if they want to have
-            the same behavior.  For those OSes, timeouts will occur after no
-            data AT ALL is received for the timeout duration.  No big deal. */
-#ifndef WIN32
-		do {
-			if( timeout == 0 ) psleep = NULL;
-			ret=SELECT( fd + 1, &rfds, NULL, NULL, psleep );
-		}  while (ret < 0 && errno==EINTR);
-#else
-		/*
-		    the select() needs some work before the above will
-		    work on win32.  The select code cannot be accessed
-		    from both the Monitor Thread and the Reading Thread.
-
-		*/
-		ret = RXTXPort(nativeavailable)( env, *jobj );
-#endif /* WIN32 */
-		if( ret == 0 )
-		{
-			report( "read_byte_array: select returned 0\n" );
-			LEAVE( "read_byte_array" );
-			break;
-		}
-		if( ret < 0 )
-		{
-			report( "read_byte_array: select returned -1\n" );
-			LEAVE( "read_byte_array" );
-			return -1;
-		}
-		ret = READ( fd, buffer + bytes, left );
-		if( ret == 0 )
-		{
-			report( "read_byte_array: read returned 0 bytes\n" );
-			LEAVE( "read_byte_array" );
-			break;
-		}
-		else if( ret < 0 )
-		{
-			report( "read_byte_array: read returned -1\n" );
-			LEAVE( "read_byte_array" );
-			return -1;
-		}
-		bytes += ret;
-		left -= ret;
-	}
-	LEAVE( "read_byte_array" );
-	return bytes;
-}
-#endif /* asdf */
-
 /*----------------------------------------------------------
 NativeEnableReceiveTimeoutThreshold
    accept:      int  threshold, int vtime,int buffer
@@ -3474,7 +3354,7 @@ JNIEXPORT jint JNICALL RXTXPort(readByte)( JNIEnv *env,
 */
 	bytes = read_byte_array( env, &jobj, fd, buffer, 1, timeout );
 	if( bytes < 0 ) {
-		LEAVE( "RXTXPort:readByte" );
+		LEAVE( "RXTXPort:readByte (nothing red)" );
 		throw_java_exception( env, IO_EXCEPTION, "readByte",
 			strerror( errno ) );
 		return -1;
@@ -3485,7 +3365,7 @@ JNIEXPORT jint JNICALL RXTXPort(readByte)( JNIEnv *env,
 	report( msg );
 	report_time_end( );
 */
-	return (bytes ? (jint)buffer[ 0 ] : -1);
+	return (jint)buffer[0];
 }
 
 /*----------------------------------------------------------
@@ -5081,14 +4961,13 @@ long get_java_var_long( JNIEnv *env, jobject jobj, char *id, char *type )
 	jclass jclazz = (*env)->GetObjectClass( env, jobj );
 	jfieldID jfd = (*env)->GetFieldID( env, jclazz, id, type );
 
-/*
 	ENTER( "get_java_var" );
-*/
+
 	if( !jfd ) {
 		(*env)->ExceptionDescribe( env );
 		(*env)->ExceptionClear( env );
 		(*env)->DeleteLocalRef( env, jclazz );
-		LEAVE( "get_java_var" );
+		LEAVE( "get_java_var. Failed to get fieldId" );
 		return result;
 	}
 	if ( !strcmp( type, "J" ) ) {
@@ -5100,9 +4979,9 @@ long get_java_var_long( JNIEnv *env, jobject jobj, char *id, char *type )
 	(*env)->DeleteLocalRef( env, jclazz );
 	if(!strncmp( "fd",id,2) && result == 0)
 		report_error( "get_java_var: invalid file descriptor\n" );
-/*
+
 	LEAVE( "get_java_var" );
-*/
+
 	return result;
 }
 
@@ -5863,31 +5742,6 @@ int check_group_uucp()
 }
 
 /*----------------------------------------------------------
- The following should be able to follow symbolic links.  I think the stat
- method used below will work on more systems.  This was found while looking
- for information.
-
- * realpath() doesn't exist on all of the systems my code has to run
-   on (HP-UX 9.x, specifically)
-----------------------------------------------------------
-int different_from_LOCKDIR(const char* ld)
-{
-	char real_ld[MAXPATHLEN];
-	char real_LOCKDIR[MAXPATHLEN];
-	if (strncmp(ld, LOCKDIR, strlen(ld)) == 0)
-		return 0;
-	if (realpath(ld, real_ld) == NULL)
-		return 1;
-	if (realpath(LOCKDIR, real_LOCKDIR) == NULL)
-		return 1;
-	if (strncmp(real_ld, real_LOCKDIR, strlen(real_ld)) == 0)
-		return 0;
-	else
-		return 1;
-}
-*/
-
-/*----------------------------------------------------------
  is_device_locked
 
    accept:      char * filename.  The device in question including the path.
@@ -6165,6 +6019,9 @@ JNI_OnLoad
 ----------------------------------------------------------*/
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *java_vm, void *reserved)
 {
+#if LIBLOCKDEV
+	liblockdev_incr_debug();
+#endif
 	javaVM = java_vm;
 	report_verbose("JNI_OnLoad called.\n");
 	return JNI_VERSION_1_2;  /* JNI API used */
@@ -6186,83 +6043,3 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved)
 	/* never called it appears */
 	printf("Experimental:  JNI_OnUnload called.\n");
 }
-
-#ifdef asdf
-/*----------------------------------------------------------
-printj
-
-   accept:      like vwprintf()
-   return:      number of jchars written or -1
-   exceptions:  none
-   comments:    prints data using System.out.print()
-----------------------------------------------------------*/
-int printj(JNIEnv *env, wchar_t *fmt, ...)
-{
-	wchar_t buf[1024];
-	int retval;
-	jstring jsBuf;
-	jclass clsSystem, clsOut;
-	jfieldID jfid;
-	jobject objOut;
-	jmethodID midPrint;
-
-	va_list ap;
-	va_start(ap, fmt);
-	retval = _vsnwprintf(buf, 1024, fmt, ap);
-	va_end(ap);
-	buf[1023] = '\0';
-
-	if((clsSystem = env->FindClass("java/lang/System")) == NULL)
-	{
-		IF_DEBUG
-		(
-			env->ExceptionDescribe();
-		)
-		env->ExceptionClear();
-		return -1;
-	}
-
-	if( ( jfid = env->GetStaticFieldID(clsSystem,
-		"out", "Ljava/io/PrintStream;" ) ) == NULL )
-	{
-		IF_DEBUG
-		(
-			env->ExceptionDescribe();
-		)
-		env->ExceptionClear();
-		env->DeleteLocalRef(clsSystem);
-		return -1;
-	}
-
-	objOut = env->GetStaticObjectField(clsSystem, jfid);
-	clsOut = env->GetObjectClass(objOut);
-
-	if( ( midPrint = env->GetMethodID(clsOut, "print",
-		"(Ljava/lang/String;)V" ) ) == NULL )
-	{
-		IF_DEBUG
-		(
-			env->ExceptionDescribe();
-		)
-		env->ExceptionClear();
-		env->DeleteLocalRef(clsOut);
-		env->DeleteLocalRef(clsSystem);
-		return -1;
-	}
-
-	jsBuf = env->NewString(buf, wcslen(buf));
-
-	env->CallVoidMethod(objOut, midPrint, jsBuf);
-
- 	env->DeleteLocalRef(jsBuf);
-	env->DeleteLocalRef(clsOut);
-	env->DeleteLocalRef(clsSystem);
-
-	return retval;
-}
-/*
-	jclass cls = ( *env )->FindClass( env, "System.Thread" );
-	jmethodID mid = ( *env )->GetStaticMethodID( env, cls, "Sleep", "(I)V" );
-	(*env)->CallStaticVoidMethod(env, cls, mid, 1);
-*/
-#endif /* asdf */

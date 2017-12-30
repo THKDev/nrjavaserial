@@ -39,3 +39,7 @@ osx:
 	make -C src/main/c osx
 	gradle build
 
+aarch64:
+	make -C src/main/c -f Makefile.aarch64
+	./gradlew build
+	
